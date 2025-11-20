@@ -129,7 +129,7 @@ async def predictRouteClient(request: Request):
         value = model_predictor.predict(dataframe=vehicle_df)[0]
 
         # Interpret the prediction result as 'Response-Yes' or 'Response-No'
-        status = "Response-Yes" if value == 1 else "Response-No"
+        status = "Yes, will purchase insurance" if value == 1 else "No, will not purchase insurance"
 
         # Render the same HTML page with the prediction result
         return templates.TemplateResponse(

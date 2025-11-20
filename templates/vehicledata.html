@@ -4,59 +4,228 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vehicle Insurance Prediction</title>
-    <!-- Corrected the CSS path -->
-    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles to ensure 'Inter' font and smooth transitions */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue/grey background */
+        }
+        .form-group > label {
+            transition: all 0.2s ease-in-out;
+        }
+        .custom-radio-group input:checked + label {
+            background-color: #10b981; /* Emerald 500 */
+            color: white;
+            border-color: #059669; /* Emerald 600 */
+            box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+        }
+        /* Spinner CSS */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 1.5rem;
+            height: 1.5rem;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Vehicle Insurance Prediction</h1>
+<body class="min-h-screen flex items-center justify-center p-4">
 
-        <form method="post" action="/">
-            <label for="Gender">Gender (1: Male, 0: Female):</label>
-            <input type="number" id="Gender" name="Gender" min="0" max="1" required>
+    <!-- Main Container Card -->
+    <div class="w-full max-w-xl bg-white rounded-2xl shadow-2xl p-6 md:p-10 border border-gray-100">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-800 mb-2">
+                SecureDrive Predictor
+            </h1>
+            <p class="text-lg text-gray-500">
+                Determine the likelihood of a customer purchasing insurance.
+            </p>
+        </header>
 
-            <label for="Age">Age:</label>
-            <input type="number" id="Age" name="Age" required>
+        <!-- Form for Prediction -->
+        <form method="post" action="/" id="prediction-form" class="space-y-6">
+            
+            <!-- Hidden inputs for complex Vehicle Age mapping -->
+            <input type="hidden" id="Vehicle_Age_lt_1_Year" name="Vehicle_Age_lt_1_Year" value="0">
+            <input type="hidden" id="Vehicle_Age_gt_2_Years" name="Vehicle_Age_gt_2_Years" value="0">
+            
+            <!-- SECTION: Personal Information -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <!-- Gender -->
+                <div class="form-group">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                    <div class="flex custom-radio-group space-x-2 w-full">
+                        <input type="radio" id="gender_male" name="Gender" value="1" class="hidden" required>
+                        <label for="gender_male" class="flex-1 text-center py-2 px-4 rounded-lg border-2 border-gray-300 cursor-pointer text-gray-600 hover:border-blue-500 hover:bg-blue-50 transition duration-150 ease-in-out">Male</label>
+                        
+                        <input type="radio" id="gender_female" name="Gender" value="0" class="hidden">
+                        <label for="gender_female" class="flex-1 text-center py-2 px-4 rounded-lg border-2 border-gray-300 cursor-pointer text-gray-600 hover:border-blue-500 hover:bg-blue-50 transition duration-150 ease-in-out">Female</label>
+                    </div>
+                </div>
 
-            <label for="Driving_License">Driving License (0: No, 1: Yes):</label>
-            <input type="number" id="Driving_License" name="Driving_License" min="0" max="1" required>
-
-            <label for="Region_Code">Region Code:</label>
-            <input type="number" step="0.01" id="Region_Code" name="Region_Code" required>
-
-            <label for="Previously_Insured">Previously Insured (0: No, 1: Yes):</label>
-            <input type="number" id="Previously_Insured" name="Previously_Insured" min="0" max="1" required>
-
-            <label for="Annual_Premium">Annual Premium:</label>
-            <input type="number" step="0.01" id="Annual_Premium" name="Annual_Premium" required>
-
-            <label for="Policy_Sales_Channel">Policy Sales Channel:</label>
-            <input type="number" step="0.01" id="Policy_Sales_Channel" name="Policy_Sales_Channel" required>
-
-            <label for="Vintage">Vintage:</label>
-            <input type="number" id="Vintage" name="Vintage" required>
-
-            <label for="Vehicle_Age_lt_1_Year">Vehicle Age < 1 Year (0: No, 1: Yes):</label>
-            <input type="number" id="Vehicle_Age_lt_1_Year" name="Vehicle_Age_lt_1_Year" min="0" max="1" required>
-
-            <label for="Vehicle_Age_gt_2_Years">Vehicle Age > 2 Years (0: No, 1: Yes):</label>
-            <input type="number" id="Vehicle_Age_gt_2_Years" name="Vehicle_Age_gt_2_Years" min="0" max="1" required>
-
-            <label for="Vehicle_Damage_Yes">Vehicle Damage (0: No, 1: Yes):</label>
-            <input type="number" id="Vehicle_Damage_Yes" name="Vehicle_Damage_Yes" min="0" max="1" required>
-
-            <button type="submit">Predict</button>
-        </form>
-
-        <form method="get" action="/train">
-            <button type="submit" class="train-button">Train Model</button>
-        </form>
-
-        {% if context %}
-            <div class="result">
-                <h2>Result: {{ context }}</h2>
+                <!-- Age -->
+                <div class="form-group">
+                    <label for="Age" class="block text-sm font-medium text-gray-700 mb-1">Age</label>
+                    <input type="number" id="Age" name="Age" required min="18" max="100" placeholder="e.g., 35"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+                </div>
             </div>
-        {% endif %}
+
+            <!-- SECTION: Vehicle & License -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <!-- Driving License -->
+                <div class="form-group">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Driving License</label>
+                    <div class="flex custom-radio-group space-x-2 w-full">
+                        <input type="radio" id="dl_yes" name="Driving_License" value="1" class="hidden" required>
+                        <label for="dl_yes" class="flex-1 text-center py-2 px-4 rounded-lg border-2 border-gray-300 cursor-pointer text-gray-600 hover:border-blue-500 hover:bg-blue-50 transition duration-150 ease-in-out">Yes</label>
+                        
+                        <input type="radio" id="dl_no" name="Driving_License" value="0" class="hidden">
+                        <label for="dl_no" class="flex-1 text-center py-2 px-4 rounded-lg border-2 border-gray-300 cursor-pointer text-gray-600 hover:border-blue-500 hover:bg-blue-50 transition duration-150 ease-in-out">No</label>
+                    </div>
+                </div>
+
+                <!-- Previously Insured -->
+                <div class="form-group">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Previously Insured</label>
+                    <div class="flex custom-radio-group space-x-2 w-full">
+                        <input type="radio" id="pi_yes" name="Previously_Insured" value="1" class="hidden" required>
+                        <label for="pi_yes" class="flex-1 text-center py-2 px-4 rounded-lg border-2 border-gray-300 cursor-pointer text-gray-600 hover:border-blue-500 hover:bg-blue-50 transition duration-150 ease-in-out">Yes</label>
+                        
+                        <input type="radio" id="pi_no" name="Previously_Insured" value="0" class="hidden">
+                        <label for="pi_no" class="flex-1 text-center py-2 px-4 rounded-lg border-2 border-gray-300 cursor-pointer text-gray-600 hover:border-blue-500 hover:bg-blue-50 transition duration-150 ease-in-out">No</label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vehicle Damage -->
+            <div class="form-group">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Vehicle Damage Reported?</label>
+                <div class="flex custom-radio-group space-x-2 w-full">
+                    <input type="radio" id="vd_yes" name="Vehicle_Damage_Yes" value="1" class="hidden" required>
+                    <label for="vd_yes" class="flex-1 text-center py-2 px-4 rounded-lg border-2 border-gray-300 cursor-pointer text-gray-600 hover:border-blue-500 hover:bg-blue-50 transition duration-150 ease-in-out">Yes</label>
+                    
+                    <input type="radio" id="vd_no" name="Vehicle_Damage_Yes" value="0" class="hidden">
+                    <label for="vd_no" class="flex-1 text-center py-2 px-4 rounded-lg border-2 border-gray-300 cursor-pointer text-gray-600 hover:border-blue-500 hover:bg-blue-50 transition duration-150 ease-in-out">No</label>
+                </div>
+            </div>
+
+            <!-- SECTION: Financial & Metrics -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <!-- Annual Premium -->
+                <div class="form-group">
+                    <label for="Annual_Premium" class="block text-sm font-medium text-gray-700 mb-1">Annual Premium ($)</label>
+                    <input type="number" step="0.01" id="Annual_Premium" name="Annual_Premium" required min="0" placeholder="e.g., 25000.50"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+                </div>
+
+                <!-- Region Code -->
+                <div class="form-group">
+                    <label for="Region_Code" class="block text-sm font-medium text-gray-700 mb-1">Region Code</label>
+                    <input type="number" step="0.01" id="Region_Code" name="Region_Code" required placeholder="e.g., 28.0"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+                </div>
+                
+                <!-- Policy Sales Channel -->
+                <div class="form-group">
+                    <label for="Policy_Sales_Channel" class="block text-sm font-medium text-gray-700 mb-1">Policy Sales Channel</label>
+                    <input type="number" step="0.01" id="Policy_Sales_Channel" name="Policy_Sales_Channel" required placeholder="e.g., 152.0"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+                </div>
+
+                <!-- Vintage -->
+                <div class="form-group">
+                    <label for="Vintage" class="block text-sm font-medium text-gray-700 mb-1">Days with Company (Vintage)</label>
+                    <input type="number" id="Vintage" name="Vintage" required min="0" max="365" placeholder="e.g., 180"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+                </div>
+            </div>
+
+            <!-- Vehicle Age (Combined Select) -->
+            <div class="form-group">
+                <label for="Vehicle_Age_select" class="block text-sm font-medium text-gray-700 mb-1">Vehicle Age</label>
+                <select id="Vehicle_Age_select" required
+                        class="mt-1 block w-full px-4 py-2 border border-gray-300 bg-white rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150 appearance-none">
+                    <option value="" disabled selected>Select vehicle age category</option>
+                    <option value="lt_1">Less than 1 Year</option>
+                    <option value="1_2">1 to 2 Years</option>
+                    <option value="gt_2">More than 2 Years</option>
+                </select>
+            </div>
+            
+            <!-- Predict Button -->
+            <button type="submit" id="predict-button" class="w-full py-3 mt-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition duration-200 ease-in-out transform hover:scale-[1.01] flex items-center justify-center">
+                <span>Run Prediction</span>
+            </button>
+        </form>
+
+        <!-- Dynamic Result Display Area (Prediction only) -->
+        <div id="dynamic-result" class="mt-8">
+            <!-- Server-side rendered context (if any) will be placed here initially -->
+            {% if context %}
+                <div class="p-4 rounded-lg border-l-4 border-blue-500 bg-blue-50 shadow-inner">
+                    <h2 class="text-xl font-bold text-blue-700">Prediction Result:</h2>
+                    <p class="mt-1 text-gray-700 text-2xl font-extrabold">{{ context }}</p>
+                </div>
+            {% endif %}
+        </div>
     </div>
+
+    <script>
+        // --- Form Element References ---
+        const ageSelect = document.getElementById('Vehicle_Age_select');
+        const lt1YearInput = document.getElementById('Vehicle_Age_lt_1_Year');
+        const gt2YearsInput = document.getElementById('Vehicle_Age_gt_2_Years');
+        const predictionForm = document.getElementById('prediction-form');
+        const predictButton = document.getElementById('predict-button');
+        // Removed trainButton reference
+
+        /**
+         * Utility function to update the hidden Vehicle Age fields based on the select box.
+         */
+        const updateHiddenAgeFields = () => {
+            const selectedValue = ageSelect.value;
+            
+            // Reset both
+            lt1YearInput.value = 0;
+            gt2YearsInput.value = 0;
+
+            if (selectedValue === 'lt_1') {
+                // Vehicle Age < 1 Year
+                lt1YearInput.value = 1;
+            } else if (selectedValue === 'gt_2') {
+                // Vehicle Age > 2 Years
+                gt2YearsInput.value = 1;
+            } 
+            // If '1_2' (1 to 2 Years), both remain 0.
+        };
+
+        // Update the hidden fields whenever the select box changes
+        ageSelect.addEventListener('change', updateHiddenAgeFields);
+
+        /**
+         * --- Prediction Form Submission Logic (For smoother UX) ---
+         * The form submits normally, relying on the server to handle the prediction and render the result.
+         */
+        predictionForm.addEventListener('submit', (e) => {
+            // 1. Ensure the hidden fields are correctly mapped before the native form submission happens
+            updateHiddenAgeFields();
+
+            // 2. Add a visual loading state to the button on submit
+            predictButton.disabled = true;
+            predictButton.innerHTML = `<div class="spinner"></div><span class="ml-2">Predicting...</span>`;
+
+            // Let the form submit normally (page reload)
+        });
+        
+        // Removed all asynchronous training logic
+    </script>
 </body>
 </html>
