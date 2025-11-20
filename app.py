@@ -16,9 +16,6 @@ from src.pipline.training_pipeline import TrainPipeline
 # Initialize FastAPI application
 app = FastAPI()
 
-# Mount the 'static' directory for serving static files (like CSS)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
 # Set up Jinja2 template engine for rendering HTML templates
 templates = Jinja2Templates(directory='templates')
 
