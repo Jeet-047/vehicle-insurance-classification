@@ -52,6 +52,103 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Run Docker Image to serve users
+      - name: Deploy (atomic, idempotent)
+        # single run block so flock file descriptor is preserved during the whole deploy
         run: |
-         docker run -d -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" -e AWS_DEFAULT_REGION="${{ secrets.AWS_DEFAULT_REGION }}" -e MONGODB_URL="${{ secrets.MONGODB_URL }}" -p 5000:5000 "${{ steps.login-ecr.outputs.registry }}"/"${{ secrets.ECR_REPO }}":latest
+          set -euo pipefail
+
+          # Settings
+          IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPO }}:latest"
+          CONTAINER_NAME="myapp-deploy"
+          HOST_PORT=5000
+          HEALTH_PATH="/"           # adjust if your health endpoint is different
+          LOCKFILE="/tmp/deploy.lock"
+
+          # Acquire exclusive lock so two parallel workflow runs on the same runner don't collide
+          exec 9>"${LOCKFILE}"
+          if ! flock -n 9; then
+            echo "Another deploy is running on this runner — aborting."
+            exit 1
+          fi
+
+          # Determine if docker requires sudo
+          if docker ps >/dev/null 2>&1; then
+            DOCKER_CMD="docker"
+          else
+            DOCKER_CMD="sudo docker"
+          fi
+          echo "Using docker command: ${DOCKER_CMD}"
+
+          # Defensive cleanup: remove existing container with the same name (if any)
+          if ${DOCKER_CMD} ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
+            echo "Stopping and removing existing container: ${CONTAINER_NAME}"
+            ${DOCKER_CMD} rm -f "${CONTAINER_NAME}" || true
+          fi
+
+          # Remove containers in CREATED state to avoid accumulation (optional)
+          CREATED_IDS=$(${DOCKER_CMD} ps -a --filter "status=created" -q || true)
+          if [ -n "${CREATED_IDS}" ]; then
+            echo "Removing created containers: ${CREATED_IDS}"
+            ${DOCKER_CMD} rm -f ${CREATED_IDS} || true
+          fi
+
+          # Fallback: if something STILL binds HOST_PORT (docker-proxy or stray process), try to free it
+          if sudo ss -tulpn | grep -qE ":${HOST_PORT}\\b"; then
+            echo "Port ${HOST_PORT} still in use. Attempting to identify process..."
+            sudo ss -tulpn | grep -E ":${HOST_PORT}\\b" || true
+
+            # If docker-proxy exists, restart docker daemon (preferred)
+            if pgrep -f docker-proxy >/dev/null 2>&1; then
+              echo "Detected docker-proxy; restarting docker service to clear stale proxies..."
+              sudo systemctl restart docker || { echo "docker restart failed; continuing to fallback."; }
+              sleep 2
+            fi
+
+            # If port still busy, kill processes listening on the port (last-resort)
+            if sudo ss -tulpn | grep -qE ":${HOST_PORT}\\b"; then
+              PIDS=$(sudo lsof -t -iTCP:${HOST_PORT} -sTCP:LISTEN || true)
+              if [ -n "${PIDS}" ]; then
+                echo "Killing PIDs listening on ${HOST_PORT}: ${PIDS}"
+                sudo kill -9 ${PIDS} || true
+              fi
+            fi
+          fi
+
+          # Final check: ensure port free before starting new container
+          if sudo ss -tulpn | grep -qE ":${HOST_PORT}\\b"; then
+            echo "Port ${HOST_PORT} is still in use after attempts to free it — aborting."
+            sudo ss -tulpn | grep -E ":${HOST_PORT}\\b" || true
+            exit 1
+          fi
+
+          # Pull the image to ensure latest
+          echo "Pulling image ${IMAGE}"
+          ${DOCKER_CMD} pull "${IMAGE}"
+
+          # Run the container with restart policy and named container (idempotent)
+          echo "Starting container ${CONTAINER_NAME} -> ${IMAGE}"
+          ${DOCKER_CMD} run -d --name "${CONTAINER_NAME}" \
+            --restart unless-stopped \
+            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -e AWS_DEFAULT_REGION="${{ secrets.AWS_DEFAULT_REGION }}" \
+            -e MONGODB_URL="${{ secrets.MONGODB_URL }}" \
+            -p ${HOST_PORT}:5000 \
+            "${IMAGE}"
+
+          # Health-check loop (local to the runner)
+          echo "Waiting for app to respond on localhost:${HOST_PORT}${HEALTH_PATH}"
+          for i in $(seq 1 15); do
+            if curl -sSf "http://127.0.0.1:${HOST_PORT}${HEALTH_PATH}" >/dev/null 2>&1; then
+              echo "App is up on localhost:${HOST_PORT}"
+              exit 0
+            fi
+            echo "Attempt ${i}/15: app not up yet — sleeping 2s"
+            sleep 2
+          done
+
+          # If healthcheck fails: print logs and exit non-zero so workflow fails
+          echo "Healthcheck failed — printing last 300 lines of container logs"
+          ${DOCKER_CMD} logs --tail 300 "${CONTAINER_NAME}" || true
+          exit 1
+        shell: bash
